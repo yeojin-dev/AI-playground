@@ -18,7 +18,7 @@ def show_image(images, labels):
             show_img = row_img + 0
         else:
             show_img = np.concatenate((show_img, row_img), axis=1)
-    
+
     plt.imshow(show_img, cmap='gray')
     plt.show()
     return 0
@@ -34,7 +34,7 @@ class mnist_data:
         # seek(offset, [where]), where(0:start, 1:current, 2:end)        
         self.image_file = read_file(os.path.join(FLAGS.data_path, FLAGS.img_name))
         self.image_size = int((self.image_file.seek(0, 2) - 16.0) / 784.0)
-        
+
         self.label_file = read_file(os.path.join(FLAGS.data_path, FLAGS.label_name))
         self.label_size = int((self.label_file.seek(0, 2) - 8.0))
 
@@ -43,7 +43,9 @@ class mnist_data:
         self.batch_size = FLAGS.batch_size
         self.index = np.arange(self.image_size)
         self.position = 0
-    
+
+        self.one_hot = np.eye(10, dtype=np.float32)
+
     def next_batch(self):
         images = list()
         labels = list()
@@ -53,12 +55,13 @@ class mnist_data:
             self.label_file.seek(8 + self.index[self.position])
 
             images.append(np.fromfile(self.image_file, dtype=np.ubyte, count=784))
-            labels.append(np.fromfile(self.label_file, dtype=np.ubyte, count=1))
+            idx = int(np.fromfile(self.label_file, dtype=np.ubyte, count=1))
+            labels.append(self.one_hot[idx])
 
             self.position += 1
-        
+
         return np.array(images, dtype=np.float32), np.array(labels, dtype=np.float32)
-    
+
     def shuffle(self):
         np.random.shuffle(self.index)
         self.position = 0

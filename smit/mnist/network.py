@@ -16,7 +16,7 @@ class MNIST:
         self.label = tf.placeholder(dtype=tf.float32, shape=[None, 10])
 
         self.lr = FLAGS.learning_rate
-        self.build_network()
+        self._build_network()
 
     def _layer(self, x, weight_shape, bias_shape, reuse=tf.AUTO_REUSE, name=None):
 
@@ -32,7 +32,7 @@ class MNIST:
         x = self._layer(digit, (784, self.num_nodes[0]), (1, self.num_nodes[0]), name='input')
 
         for index in range(self.num_layers-1):
-            name = f'hidden_{index-1}'
+            name = f'hidden_{index+1}'
             x = self._layer(
                 x=x,
                 weight_shape=(self.num_nodes[index], self.num_nodes[index+1]),

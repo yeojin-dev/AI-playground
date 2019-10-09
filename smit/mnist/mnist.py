@@ -74,14 +74,14 @@ def arg_process():
     return args, unknown
 
 
-def main():
+def main(_):
 
     print('Starting MNIST Digit Recognition Learning')
 
     mnist_data = utils.mnist_data(FLAGS=FLAGS)
     net = network.MNIST(FLAGS=FLAGS)
 
-    train_op, cost = net.optimizer()
+    _train_op, _cost = net.optimizer()
 
     per_epoch = mnist_data.image_size // FLAGS.batch_size
 
@@ -91,10 +91,10 @@ def main():
         for step in range(per_epoch):
             digit, label = mnist_data.next_batch()
             feed_dict = {net.digit: digit, net.label: label}
-            _, cost = net.sess.run([train_op, cost], feed_dict=feed_dict)
+            _, cost = net.sess.run([_train_op, _cost], feed_dict=feed_dict)
             sum_cost += cost
         mean_cost = sum_cost / float(per_epoch)
-        print(f'Learning at f{index} epoch, Cost of {mean_cost:1.4f}')
+        print(f'Learning at {index} epoch, Cost of {mean_cost:1.4f}')
 
 
 if __name__ == '__main__':
