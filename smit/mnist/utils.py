@@ -38,10 +38,10 @@ class mnist_data:
         self.label_file = read_file(os.path.join(FLAGS.data_path, FLAGS.label_name))
         self.label_size = int((self.label_file.seek(0, 2) - 8.0))
 
-        assert self.image_size = self.label_size
+        assert self.image_size == self.label_size
 
         self.batch_size = FLAGS.batch_size
-        self.index = np.arrage(self.image_size)
+        self.index = np.arange(self.image_size)
         self.position = 0
     
     def next_batch(self):
@@ -53,7 +53,7 @@ class mnist_data:
             self.label_file.seek(8 + self.index[self.position])
 
             images.append(np.fromfile(self.image_file, dtype=np.ubyte, count=784))
-            lables.append(np.fromfile(self.label_file, dtype=np.ubyte, count=1))
+            labels.append(np.fromfile(self.label_file, dtype=np.ubyte, count=1))
 
             self.position += 1
         
