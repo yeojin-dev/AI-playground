@@ -58,18 +58,40 @@ def arg_process():
     parser.add_argument(
         '--num_layers',
         type=int,
-        default=2,
+        default=3,
         help='parameter for layers',
     )
     parser.add_argument(
         '--num_nodes',
         nargs='+',
         type=int,
-        default=[256, 256],
+        default=[128, 128, 128],
         help='parameter for nodes',
         required=False,
     )
-
+    parser.add_argument(
+        '--num_depths',
+        nargs='+',
+        type=int,
+        default=[16, 32, 64],
+        help='number of output channels for each conv layer',
+        required=False,
+    )
+    parser.add_argument(
+        '--kernel_size',
+        nargs='+',
+        type=int,
+        default=[(5, 5), (5, 5), (5, 5)],
+        help='size of kernels for each conv layer',
+        required=False,
+    )
+    parser.add_argument(
+        '--nw_type',
+        type=str,
+        default='conv',  # or 'dense'
+        help='the type of network(dense of conv)',
+        required=False,
+    )
     args, unknown = parser.parse_known_args()
     return args, unknown
 
