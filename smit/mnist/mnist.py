@@ -110,6 +110,8 @@ def main(_):
     for index in range(FLAGS.num_epoch):
         mnist_data.shuffle()
         sum_cost = 0
+
+        # Training
         for step in range(per_epoch):
             digit, label = mnist_data.next_batch()
             feed_dict = {net.digit: digit, net.label: label}
@@ -117,6 +119,15 @@ def main(_):
             sum_cost += cost
         mean_cost = sum_cost / float(per_epoch)
         print(f'Learning at {index} epoch, Cost of {mean_cost:1.4f}')
+
+        # Evaluation
+        batch_x, batch_y = mnist_data.eval_data()
+        feed_dict_evaluation = {net.digit: batch_x, net.label: batch_y}
+        out = net.inference
+        _accuracy = net.evaluate(out, batch_y)
+        accuracy = net.sess.run(_accuracy, feed_dict=feed_dict_evaluation)
+
+        print(f'Evaluation at {index} epoch, accuracy of {accuracy:1.4f}')
 
 
 if __name__ == '__main__':
