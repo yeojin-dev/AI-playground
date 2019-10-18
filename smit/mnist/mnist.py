@@ -21,6 +21,13 @@ def arg_process():
         required=False,
     )
     parser.add_argument(
+        '--log_dir',
+        type=str,
+        default=os.path.dirname(os.path.abspath(__file__)),
+        help='the directory where the MNIST images were located',
+        required=False,
+    )
+    parser.add_argument(
         '--img_name',
         type=str,
         default='train-images.idx3-ubyte',
@@ -103,7 +110,7 @@ def main(_):
     mnist_data = utils.mnist_data(FLAGS=FLAGS)
     net = network.MNIST(FLAGS=FLAGS)
 
-    _train_op, _cost = net.optimizer()
+    _train_op, _cost, _summary = net.optimizer()
 
     per_epoch = mnist_data.image_size // FLAGS.batch_size
 
@@ -126,6 +133,9 @@ def main(_):
         out = net.inference
         _accuracy = net.evaluate(out, batch_y)
         accuracy = net.sess.run(_accuracy, feed_dict=feed_dict_evaluation)
+
+        sum_ptr = net.sess.run(_summary, feed_dict={net.epoch_cost: mean_cost, net.epoch_eval: accuracy})
+        net.writer.add_summary(sum_ptr, index)
 
         print(f'Evaluation at {index} epoch, accuracy of {accuracy:1.4f}')
 

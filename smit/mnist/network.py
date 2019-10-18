@@ -21,7 +21,13 @@ class MNIST:
         self.digit = tf.placeholder(dtype=tf.float32)
         self.label = tf.placeholder(dtype=tf.float32)
 
+        self.epoch_cost = tf.placeholder(dtype=tf.float32)
+        self.epoch_eval = tf.placeholder(dtype=tf.float32)
+
         self.lr = FLAGS.learning_rate
+
+        self.writer = tf.summary.FileWriter(FLAGS.log_dir)
+
         self._build_network()
 
     def _dense_layer(self, x, weight_shape, bias_shape, reuse=tf.AUTO_REUSE, name=None):
@@ -133,6 +139,34 @@ class MNIST:
         nw_out = self.inference
         self.cost = self._get_loss(nw_out, self.label)
 
+    def _summarize(self):
+        summary_all = list()
+
+        summary_all.append(tf.summary.scalar("Training Loss", self.epoch_cost))
+        summary_all.append(tf.summary.scalar("Evaluation Accuracy", self.epoch_eval))
+
+        all_vars = tf.trainable_variables()
+
+        for index in range(self.num_layers):
+            name = f'conv_{index+1}'
+            # tf.layers 패키지에서 (name + /conv2d/kernel), (name + /conv2d/bias) 형식으로 텐서 이름 생성
+            weight = [var for var in all_vars if (name + '/conv2d/kernel:0') in var.name]
+            if len(weight) == 0:
+                print(f'\nNo weight found in {name}')
+            else:
+                summary_all.append(tf.summary.histogram(f'{name}/weights', weight[0]))
+
+        name = 'output'
+        weight = [var for var in all_vars if (name + '/conv2d/kernel:0') in var.name]
+        if len(weight) == 0:
+            print(f'\nNo weight found in {name}')
+        else:
+            summary_all.append(tf.summary.histogram(f'{name}/weights', weight[0]))
+
+        summary_ptr = tf.summary.merge(summary_all)
+
+        return summary_ptr
+
     def optimizer(self):
 
         opt = tf.train.AdamOptimizer(learning_rate=self.lr)
@@ -141,7 +175,10 @@ class MNIST:
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
 
-        return train_op, self.cost
+        self.writer.add_graph(self.sess.graph)
+        sum_ptr = self._summarize()
+
+        return train_op, self.cost, sum_ptr
 
     def evaluate(self, output, y):
 
