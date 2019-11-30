@@ -90,3 +90,67 @@ class ICNet(Network):
 			self.reservoir['conv3_1'] = x + 0.0
 
 			return 0
+
+	def _pyramid_pool(self, inputs, name, reuse=tf.AUTO_REUSE):
+
+		size = tf.shape(inputs)[1:3]
+
+		pool1 = tf.reduce_mean(inputs, axis=[1, 2], keepdims=True)
+		pool1 = tf.image.resize_bilinear(pool1, size=size, align_corners=True)
+
+		part = list()
+		h_w = tf.div(size, tf.constant(2))
+		h, w = h_w[0], h_w[1]
+		for ht in range(2):
+			for wd in range(2):
+				id_h1, id_h2 = h * ht, h * (ht + 1)
+				id_w1, id_w2 = w * wd, w * (wd + 1)
+				part.append(tf.reduce_mean(inputs[:, id_h1:id_h2, id_w1:id_w2, :], axis=[1, 2], keepdims=True))
+
+		pool2 = tf.concat(part[:2], axis=2)
+		for index in range(1, 2):
+			pos = index * 2
+			row = tf.concat(part[pos:pos + 2], axis=2)
+			pool2 = tf.concat([pool2, row], axis=1)
+		pool2 = tf.image.resize_bilinear(pool2, size=size, align_corners=True)
+
+		part = list()
+		h_w = tf.div(size, tf.constant(3))
+		h, w = h_w[0], h_w[1]
+		for ht in range(3):
+			for wd in range(3):
+				id_h1, id_h2 = h * ht, h * (ht + 1)
+				id_w1, id_w2 = w * wd, w * (wd + 1)
+				part.append(tf.reduce_mean(inputs[:, id_h1:id_h2, id_w1:id_w2, :], axis=[1, 2], keepdims=True))
+
+		pool3 = tf.concat(part[:3], axis=2)
+		for index in range(1, 3):
+			pos = index * 3
+			row = tf.concat(part[pos:pos + 3], axis=2)
+			pool3 = tf.concat([pool3, row], axis=1)
+		pool3 = tf.image.resize_bilinear(pool3, size=size, align_corners=True)
+
+		part = list()
+		h_w = tf.div(size, tf.constant(6))
+		h, w = h_w[0], h_w[1]
+		for ht in range(6):
+			for wd in range(6):
+				id_h1, id_h2 = h * ht, h * (ht + 1)
+				id_w1, id_w2 = w * wd, w * (wd + 1)
+				part.append(tf.reduce_mean(inputs[:, id_h1:id_h2, id_w1:id_w2, :], axis=[1, 2], keepdims=True))
+
+		pool6 = tf.concat(part[:6], axis=2)
+		for index in range(1, 6):
+			pos = index * 6
+			row = tf.concat(part[pos:pos + 6], axis=2)
+			pool6 = tf.concat([pool6, row], axis=1)
+		pool6 = tf.image.resize_bilinear(pool6, size=size, align_corners=True)
+
+		with tf.variable_scope(name, reuse=reuse):
+			out = tf.add_n([inputs, pool6, pool3, pool2, pool1])
+
+			(self.feed(out)
+			 	.conv(filters=256, kernel_size=1, strides=1, activation=None, name='1x1Pool')
+			 	.batch_normalization(name='1x1Poolbn'))
+
+			return self.terminals[0] + 0.0
