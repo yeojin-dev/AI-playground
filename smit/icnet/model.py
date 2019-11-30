@@ -240,3 +240,28 @@ class ICNet(Network):
 			self.reservoir['conv3'] = self.terminals[0] + 0.0
 
 			return 0
+
+	def _fusion_module(self, small_tensor, large_tensor, s_ch, l_ch, name, reuse=tf.AUTO_REUSE):
+
+		large_size = tf.shape(large_tensor)[1:3]
+
+		with tf.variable_scope(name, reuse=reuse):
+
+			self.feed(small_tensor).resize_bilinear(large_size, name='interp')
+
+			self.reservoir[name+'_out'] = self.terminals[0] + 0.0
+
+			(self.conv_nn(filters=(3, 3, s_ch, 128), rate=2, activation=None, name='3x3', reuse=reuse)
+				.batch_normalization(activation=None, name='3x3bn'))
+
+			f_small = self.terminals[0] + 0.0
+
+			(self.feed(large_tensor)
+			 	.conv_nn(filters=(1, 1, l_ch, 128), activation=None, name='1x1', reuse=reuse)
+				.batch_normalization(activation=None, name='1x1bn'))
+
+			f_used = tf.add(f_small, self.terminals[0])
+
+			self.feed(f_used).activator(name='activation')
+
+			return self.terminals[0] + 0.0
