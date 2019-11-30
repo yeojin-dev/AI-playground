@@ -196,3 +196,47 @@ class ICNet(Network):
 			self.feed(output).activator()
 
 			return self.terminals[0]
+
+	def _branch4(self, inputs, name, reuse=False):
+
+		new_size = tf.shape(inputs)[1:3] // 2
+
+		with tf.variable_scope(name):
+			self.feed(inputs).resize_bilinear(size=new_size, name='conv3_1_reduce')
+
+			x = self._res_bottleneck(self.terminals[0], 256, 256, name='conv3_2')
+
+			x = self._res_bottleneck(x, 256, 256, name='conv3_3')
+			x = self._res_bottleneck(x, 256, 256, name='conv3_3')
+
+			x = self._res_bottleneck_d(x, 256, 512, name='conv4_1')
+			x = self._res_bottleneck_d(x, 512, 512, name='conv4_2')
+			x = self._res_bottleneck_d(x, 512, 512, name='conv4_3')
+			x = self._res_bottleneck_d(x, 512, 512, name='conv4_4')
+			x = self._res_bottleneck_d(x, 512, 512, name='conv4_5')
+			x = self._res_bottleneck_d(x, 512, 512, name='conv4_6')
+
+			x = self._res_bottleneck_d(x, 512, 1024, rate=4, name='conv5_1')
+			x = self._res_bottleneck_d(x, 1024, 1024, rate=4, name='conv5_2')
+			x = self._res_bottleneck_d(x, 1024, 1024, rate=4, name='conv5_3')
+
+			x = self._pyramid_pool(x, name='PyPool')  # returns 256 channels output
+
+			self.reservoir['conv5_3'] = x + 0.0
+
+			return 0
+
+	def _branch1(self, inputs, name, reuse=False):
+
+		with tf.variable_scope(name):
+			(self.feed(inputs)
+				.conv(filters=32, kernel_size=3, strides=2, activation=None, name='3x3_1', reuse=reuse)
+			 	.batch_normalization(name='3x3_1bn')
+			 	.conv(filters=32, kernel_size=3, strides=2, activation=None, name='3x3_2', reuse=reuse)
+			 	.batch_normalization(name='3x3_2bn')
+			 	.conv(filters=64, kernel_size=3, strides=2, activation=None, name='3x3_3', reuse=reuse)
+			 	.batch_normalization(name='3x3_3bn'))
+
+			self.reservoir['conv3'] = self.terminals[0] + 0.0
+
+			return 0
