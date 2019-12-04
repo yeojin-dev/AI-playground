@@ -1,3 +1,5 @@
+import os
+
 import tensorflow as tf
 
 from .network import Network
@@ -265,3 +267,133 @@ class ICNet(Network):
 			self.feed(f_used).activator(name='activation')
 
 			return self.terminals[0] + 0.0
+
+	def _tail(self, inputs, name, reuse=False):
+
+		size = tf.multiply(tf.shape(inputs)[1:3], tf.constant(2))
+
+		with tf.variable_scope(name, reuse=reuse):
+
+			self.feed(inputs).resize_bilinear(size, name='interp')
+
+			self.reservoir[name+'_out'] = self.terminals[0] + 0.0
+
+	def _get_mask(self, gt, num_classes, ignore_label):
+
+		class_mask = tf.less_equal(gt, num_classes-1)
+		not_ignore_mask = tf.not_equal(gt, ignore_label)
+		mask = tf.logical_and(class_mask, not_ignore_mask)
+		indices = tf.squeeze(tf.where(mask), 1)
+
+		return indices
+
+	def _loss(self, name, reuse=False):
+		# prediction
+		tensors = (self.reservoir['sub4_out'], self.reservoir['sub2_out'], self.reservoir['sub1_out'])
+
+		losses = list()
+		predictions = list()
+		labels = list()
+
+		with tf.variable_scope(name):
+			for index in range(len(tensors)):
+				(self.feed(tensors[index])
+				 	.conv(
+						filters=self.num_classes,
+						kernel_size=1,
+						strides=1,
+						use_bias=True,
+						activation=None,
+						name='cls_{}'.format(index),
+					reuse=reuse))
+				predictions.append(self.terminals[0] + 0.0)
+
+			# resizing labels
+			for index in range(len(predictions)):
+				size = tf.shape(predictions[index])[1:3]
+				(self.feed(self.labels)
+				 	.resize_nn(size, name='interp_{}'.format(index)))
+				labels.append(tf.squeeze(self.terminals[0], axis=[3]))
+
+			self.reservoir['digits_out'] = predictions[-1]
+
+			# ignore label process and loss calc.
+			t_loss = 0.0
+			for index in range(len(labels)):
+				gt = tf.reshape(labels[index], (-1,))
+				indices = self._get_mask(gt, self.num_classes, self.ignore_label)  # get label pos. with not ignore label
+				gt = tf.cast(tf.gather(gt, indices), tf.int32)  # only not-ignore_label ground-truth
+
+				pred = tf.reshape(predictions[index], (-1, self.num_classes))
+				pred = tf.gather(pred, indices)  # only not-ignore_label prediction
+
+				loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(logits=pred, labels=gt))
+				t_loss += self.loss_weight[index] * loss
+				losses.append(loss)
+
+			losses.append(t_loss)
+
+			return losses
+
+	def optimizer(self):
+		# weight-decay, learning-rate control, optimizer selection with bn training
+		if self.cfg.WEIGHT_DECAY != 0.0:
+			l2_weight = tf.add_n([tf.nn.l2_loss(var) for var in tf.trainable_variables() if ('bn' not in var.name)])
+			loss_to_opt = self.losses[-1] + self.cfg.WEIGHT_DECAY * l2_weight
+			self.losses.append(loss_to_opt)
+
+		if self.cfg.LR_CONTROL is 'poly':
+			base_lr = tf.constant(self.cfg.LEARNING_RATE)
+			learning_rate = tf.scalar_mul(base_lr, tf.pow((1 - self.step_ph / self.cfg.MAX_ITERATION), self.cfg.POWER))
+		else:
+			learning_rate = self.cfg.LEARNING_RATE
+
+		opt = tf.train.AdamOptimizer(learning_rate=learning_rate)
+		train_op = opt.minimize(self.losses[-1])
+
+		if self.cfg.BN_LEARN:
+			update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+			train_op = tf.group([train_op, update_ops])
+
+		# create session
+		gpu_options = tf.GPUOptions(allow_growth=True, allocator_type='BFC', visible_device_list='0')
+		config = tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True)
+		self.sess = tf.Session(config=config)
+		self.sess.run(tf.global_variables_initializer())
+
+		# check-point processing
+		self.saver = tf.train.Saver()
+		ckpt_loc = self.cfg.ckpt_dir
+		self.ckpt_name = os.path.join(ckpt_loc, 'ICnetModel')
+
+		ckpt = tf.train.get_checkpoint_state(ckpt_loc)
+		if ckpt and ckpt.model_checkpoint_path:
+			import re
+			self.saver.restore(self.sess, ckpt.model_checkpoint_path)
+
+			ckpt_name = os.path.basename(ckpt.model_checkpoint_path)
+			self.start_step = int(next(re.finditer("(\d+)(?!.*\d)", ckpt_name)).group(0))
+			print("---------------------------------------------------------")
+			print(" Success to load checkpoint - {}".format(ckpt_name))
+			print(" Session starts at step - {}".format(self.start_step))
+			print("---------------------------------------------------------")
+		else:
+			if not os.path.exists(ckpt_loc):
+				os.makedirs(ckpt_loc)
+			self.start_step = 0
+			print("**********************************************************")
+			print("  [*] Failed to find a checkpoint - Start from the first")
+			print(" Session starts at step - {}".format(self.start_step))
+			print("**********************************************************")
+
+		# summary and summary Writer
+		_ = tf.summary.scalar('Branch4 Loss', self.losses[0])
+		_ = tf.summary.scalar('Branch2 Loss', self.losses[1])
+		_ = tf.summary.scalar('Branch1 Loss', self.losses[2])
+		_ = tf.summary.scalar('Total Loss', self.losses[3])
+
+		self.summaries = tf.summary.merge_all()
+
+		self.writer = tf.summary.FileWriter(self.cfg.log_dir, self.sess.graph)
+
+		return train_op, self.losses, self.summaries
