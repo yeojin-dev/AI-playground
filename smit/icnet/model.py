@@ -397,3 +397,31 @@ class ICNet(Network):
 		self.writer = tf.summary.FileWriter(self.cfg.log_dir, self.sess.graph)
 
 		return train_op, self.losses, self.summaries
+
+	def save(self, global_step):
+		self.saver.save(self.sess, self.ckpt_name, global_step)
+		print('The checkpoint has been created, step: {}'.format(global_step))
+
+	def _build(self, is_training=True):
+		self._branch2(self.images2, name='br2')
+		self._branch4(self.reservoir['conv3_1'], name='br4')
+		self._branch1(self.images, name='br1')
+
+		x = self._fusion_module(
+			self.reservoir['conv5_3'],
+			self.reservoir['conv3_1'],
+			256,
+			256,
+			name='sub4',
+		)
+		x = self._fusion_module(
+			x,
+			self.reservoir['conv3'],
+			128,
+			64,
+			name='sub2',
+		)
+
+		self._tail(x, name='sub1')
+
+		self.losses = self._loss(name='loss')
