@@ -154,3 +154,45 @@ class ICNet(Network):
 			 	.batch_normalization(name='1x1Poolbn'))
 
 			return self.terminals[0] + 0.0
+
+	def _res_bottleneck_d(self, inputs, ch_in, ch_out, rate=2, strides=(1, 1, 1, 1), name=None, reuse=tf.AUTO_REUSE):
+
+		need_tr = (ch_in != ch_out) or (strides != (1, 1, 1, 1))
+
+		if need_tr:
+			scope = name + '_sc'
+
+			with tf.variable_scope(scope, reuse=reuse):
+
+				(self.feed(inputs)
+					.conv_nn(
+						filters=(1, 1, ch_in, ch_out),
+						strides=strides,
+						activation=None,
+						name='ch_modifier',
+						reuse=reuse
+					)
+					.batch_normalization(name='bn', activation=None))
+
+				sc_out = self.terminals[0] + 0.0
+		else:
+			sc_out = inputs + 0.0
+
+		scope = name + '_mb'
+		depth4 = ch_out // 4
+		with tf.variable_scope(scope):
+			(self.feed(inputs)
+				.conv_nn(filters=(1, 1, ch_in, depth4), strides=strides, activation=None, name='1x1_1', reuse=reuse)
+				.batch_normalization(name='1x1_1bn')
+			 	.d_conv(filters=(3, 3, depth4, depth4), rate=rate, activation=None, name='d3x3_2', reuse=reuse)
+				.batch_normalization(name='3x3_2bn')
+				.conv_nn(filters=(1, 1, depth4, ch_out), name='1x1_3', activation=None, reuse=reuse)
+				.batch_normalization(name='1x1_3bn', activation=None))
+
+			mb_out = self.terminals[0] + 0.0
+
+		with tf.variable_scope(name):
+			output = sc_out + mb_out
+			self.feed(output).activator()
+
+			return self.terminals[0]
