@@ -148,7 +148,7 @@ def _image_cropping(image, label, cfg):
 
 	img_crop = combined_crop[:, :, :-1]
 
-	label_crop = tf.expend_dims(combined_crop[:, :, :-1], axis=2)
+	label_crop = tf.expand_dims(combined_crop[:, :, -1], axis=2)
 	label_crop += ignore_label
 	label_crop = tf.cast(label_crop, dtype=tf.uint8)
 
