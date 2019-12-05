@@ -1,15 +1,15 @@
 import argparse
 import time
 
-from .model import ICNet
-from .utils import Config, ImageReader
+from model import ICNet
+from utils import Config, ImageReader
 
 
 def get_arguments():
 	parser = argparse.ArgumentParser(description='Implementation for ICNet Semantic Segmentation')
 
 	parser.add_argument(
-		'--data_set',
+		'--dataset',
 		type=str,
 		default='cityscapes',
 		help='which dataset to trained with',

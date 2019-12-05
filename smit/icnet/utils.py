@@ -6,7 +6,7 @@ import tensorflow as tf
 
 
 class Config:
-	CITYSCAPES_DATA_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__), 'cityscapes'))
+	CITYSCAPES_DATA_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'cityscapes')
 	CITYSCAPES_TRAIN_LIST = os.path.join(CITYSCAPES_DATA_DIR, 'trainAttribute.txt')
 	CITYSCAPES_EVAL_LIST = os.path.join(CITYSCAPES_DATA_DIR, 'valAttribute.txt')
 
@@ -45,12 +45,12 @@ class Config:
 
 	# loss function = LAMBDA1 * sub4_loss + LAMBDA2 * sub24_loss + LAMBDA3 * sub124_loss + weight_decay
 	LAMBDA1 = 0.4
-	LABMDA2 = 0.4
+	LAMBDA2 = 0.4
 	LAMBDA3 = 1.0
 
 	BATCH_SIZE = 8
 	BUFFER_SIZE = 2
-	N_WORKERS = min(mp.cpu.count(), BATCH_SIZE)
+	N_WORKERS = min(mp.cpu_count(), BATCH_SIZE)
 
 	def __init__(self, args):
 		print('SETUP CONFIGURATIONS...')
@@ -82,7 +82,7 @@ class Config:
 				print('{:30} {}'.format(configuration, configuration_value))
 			if configuration == 'param':
 				print(configuration)
-				for k, v in configuration.items():
+				for k, v in getattr(self, configuration).items():
 					print('\t{:27} {}'.format(k, v))
 		print('\n')
 
@@ -104,7 +104,7 @@ def _read_attribute_list(data_dir, data_list):
 			if not tf.gfile.Exists(attributes[1]):
 				raise ValueError(f'Failed to find file: {attributes[1]}')
 
-		att_file.append(attributes)
+			att_file.append(attributes)
 
 	return att_file
 
@@ -170,7 +170,7 @@ def _train_process(attributes, cfg):
 	label = tf.cast(tf.image.decode_image(label_contents, channels=1), dtype=tf.float32)
 
 	img.set_shape((cfg.param['eval_size'][0], cfg.param['eval_size'][1], 3))
-	label.set_shaep((cfg.param['eval_size'][0], cfg.param['eval_size'][1], 1))
+	label.set_shape((cfg.param['eval_size'][0], cfg.param['eval_size'][1], 1))
 
 	return img, label
 
@@ -198,15 +198,15 @@ class ImageReader:
 
 		mode = cfg.mode
 
-		self.attribute_list = _read_attribute_list(cfg.param['data_dir'], cfg.param[mode + 'list'])
-		print(f'read attribute file - {cfg.param[mode + "list"]}')
+		self.attribute_list = _read_attribute_list(cfg.param['data_dir'], cfg.param[mode + '_list'])
+		print('read attribute file - {}'.format(cfg.param[mode + '_list']))
 
 		if mode == 'train':
 			self.dataset = self._train_dataset(cfg)
 		elif mode == 'eval':
 			self.dataset = self._eval_dataset(cfg)
 		else:
-			raise NotImplementedError('N/A, other than train or val')
+			raise NotImplementedError('N/A, other than train or eval')
 
 	def _train_dataset(self, cfg):
 

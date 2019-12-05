@@ -2,7 +2,7 @@ import os
 
 import tensorflow as tf
 
-from .network import Network
+from network import Network
 
 
 class ICNet(Network):
@@ -13,7 +13,7 @@ class ICNet(Network):
 		self.mode = cfg.mode
 		self.num_classes = cfg.param['num_classes']
 		self.ignore_label = cfg.param['ignore_label']
-		self.loss_weight = (cfg.LAMBDA1, cfg.LABMDA2, cfg.LABMDA3)
+		self.loss_weight = (cfg.LAMBDA1, cfg.LAMBDA2, cfg.LAMBDA3)
 		self.reservoir = dict()
 		self.losses = None
 		self.start_epoch = 0
@@ -77,17 +77,17 @@ class ICNet(Network):
 		with tf.variable_scope(name):
 			(self.feed(inputs)
 				.conv(filters=32, kernel_size=3, strides=2, activation=None, name='conv1_1', reuse=reuse)
-				.batch_nomalization(name='conv1_1bn')
+				.batch_normalization(name='conv1_1bn')
 				.conv(filters=32, kernel_size=3, strides=1, activation=None, name='conv1_2', reuse=reuse)
-				.batch_nomalization(name='conv1_2bn')
+				.batch_normalization(name='conv1_2bn')
 				.conv(filters=64, kernel_size=3, strides=1, activation=None, name='conv1_3', reuse=reuse)
-				.batch_nomalization(name='conv1_3bn')
-				.max_pool(poll_size=3, name='max_pool'))
+				.batch_normalization(name='conv1_3bn')
+				.max_pool(pool_size=3, name='max_pool'))
 
 			x = self._res_bottleneck(self.terminals[0], 64, 128, name='conv2_1')
 			x = self._res_bottleneck(x, 128, 128, name='conv2_2')
 			x = self._res_bottleneck(x, 128, 128, name='conv2_3')
-			x = self._res_bottleneck(x, 128, 256, strides=2, name='conv3_1')
+			x = self._res_bottleneck(x, 128, 256, strides=(1, 2, 2, 1), name='conv3_1')
 
 			self.reservoir['conv3_1'] = x + 0.0
 
@@ -209,7 +209,7 @@ class ICNet(Network):
 			x = self._res_bottleneck(self.terminals[0], 256, 256, name='conv3_2')
 
 			x = self._res_bottleneck(x, 256, 256, name='conv3_3')
-			x = self._res_bottleneck(x, 256, 256, name='conv3_3')
+			x = self._res_bottleneck(x, 256, 256, name='conv3_4')
 
 			x = self._res_bottleneck_d(x, 256, 512, name='conv4_1')
 			x = self._res_bottleneck_d(x, 512, 512, name='conv4_2')

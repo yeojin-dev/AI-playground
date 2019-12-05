@@ -12,7 +12,7 @@ def layer(op):
 
 		name = kwargs.setdefault('name', 'no_given_name')
 
-		terminal_length = self.terminals
+		terminal_length = len(self.terminals)
 
 		if terminal_length == 0:
 			raise RuntimeError(f'No input variables found for layer {name}')
@@ -26,6 +26,8 @@ def layer(op):
 		self.feed(layer_output)
 
 		return self
+
+	return layer_decorated
 
 
 class Network:
@@ -43,13 +45,13 @@ class Network:
 		return self
 
 	@layer
-	def conv(self, inputs, filters, kernal_size=3, strides=1, padding='SAME',
+	def conv(self, inputs, filters, kernel_size=3, strides=1, padding='SAME',
 			 activation=DEFAULT_ACTIVATION, use_bias=False, kernel_initializer=DEFAULT_INITIALIZER,
 			 name=None, reuse=tf.AUTO_REUSE):
 		output = tf.layers.conv2d(
 			inputs=inputs,
 			filters=filters,
-			kernal_size=kernal_size,
+			kernel_size=kernel_size,
 			strides=strides,
 			padding=padding,
 			activation=activation,
@@ -65,10 +67,10 @@ class Network:
 	def conv_nn(self, inputs, filters, rate=1, strides=[1, 1, 1, 1], padding='SAME',
 				activation=DEFAULT_ACTIVATION, use_bias=False, kernel_initializer=DEFAULT_INITIALIZER,
 				name=None, reuse=tf.AUTO_REUSE):
-		with tf.variable_scope(name):
+		with tf.variable_scope(name, reuse=reuse):
 			kernels = tf.get_variable(name='kernel', shape=filters, initializer=kernel_initializer)
 
-			x = tf.nn.conv2d(inputs, kernels, dilations=[1, rate, rate, 1], strides=strides, padding=padding)
+			x = tf.nn.conv2d(inputs, kernels, dilations=[1, 1, 1, 1], strides=strides, padding=padding)
 
 			if use_bias:
 				bias = tf.get_variable(name='bias', shape=[filters[3]], initializer=tf.constant_initializer(value=0))
@@ -138,8 +140,8 @@ class Network:
 			kernel = tf.get_variable(name='kernel', shape=filters, initializer=kernel_initializer)
 
 			x = tf.nn.atrous_conv2d(
-				inputs=inputs,
-				kernel=kernel,
+				value=inputs,
+				filters=kernel,
 				rate=rate,
 				padding=padding,
 			)
