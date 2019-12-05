@@ -122,6 +122,17 @@ def _image_scaling(img, label):
 	return img, label
 
 
+def _image_mirroring(img, label):
+	prob = tf.random_uniform([1], 0, 1.0, dtype=tf.float32)[0]
+
+	flip = lambda: (tf.image.flip_left_right(img), tf.image.flip_left_right(label))
+	as_is = lambda: (img, label)
+
+	img, label = tf.cond(tf.less_equal(prob, 0.5), flip, as_is)
+
+	return img, label
+
+
 def _image_cropping(image, label, cfg):
 	crop_h, crop_w = cfg.TRAIN_SIZE
 	ignore_label = cfg.param['ignore_label']
@@ -169,8 +180,12 @@ def _train_process(attributes, cfg):
 	img -= cfg.IMG_MEAN
 	label = tf.cast(tf.image.decode_image(label_contents, channels=1), dtype=tf.float32)
 
-	img.set_shape((cfg.param['eval_size'][0], cfg.param['eval_size'][1], 3))
-	label.set_shape((cfg.param['eval_size'][0], cfg.param['eval_size'][1], 1))
+	if cfg.random_mirror:
+		img, label = _image_mirroring(img, label)
+	if cfg.random_scale:
+		img, label = _image_scaling(img, label)
+
+	img, label = _image_cropping(img, label, cfg)
 
 	return img, label
 
