@@ -110,14 +110,15 @@ def _read_attribute_list(data_dir, data_list):
 
 
 def _image_scaling(img, label):
-	scale = tf.random_uniform((1,), minval=0.5, maxval=2.0, dtype=tf.float32, seed=None)
-	new_shape = tf.squeeze(tf.to_int32(tf.to_float(tf.shape(img)[:-1] * scale)))
+	scale = tf.random_uniform([1], minval=0.5, maxval=2.0, dtype=tf.float32, seed=None)
+	new_shape = tf.squeeze(tf.to_int32(tf.to_float(tf.shape(img)[:-1]) * scale))
 
 	img = tf.image.resize_images(img, new_shape)
-	label = tf.squeeze(
-		tf.image.resize_nearest_neighbor(tf.expand_dims(label, axis=0), new_shape),
-		axis=0,
+	label = tf.image.resize_nearest_neighbor(
+		tf.expand_dims(label, axis=0),
+		new_shape,
 	)
+	label = tf.squeeze(label, axis=0)
 
 	return img, label
 
