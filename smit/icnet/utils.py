@@ -140,7 +140,7 @@ def _image_cropping(image, label, cfg):
 
 	label = tf.cast(label, dtype=tf.float32)
 	label -= ignore_label
-	combined = tf.concat(axis=1, values=[image, label])
+	combined = tf.concat(axis=2, values=[image, label])
 	image_shape = tf.shape(image)
 
 	trg_height = tf.maximum(crop_h, image_shape[0])
@@ -177,9 +177,9 @@ def _train_process(attributes, cfg):
 	img_contents = tf.read_file(image_filename)
 	label_contents = tf.read_file(label_filename)
 
-	img = tf.cast(tf.image.decode_image(img_contents, channels=3), dtype=tf.float32)
+	img = tf.cast(tf.image.decode_png(img_contents, channels=3), dtype=tf.float32)
 	img -= cfg.IMG_MEAN
-	label = tf.cast(tf.image.decode_image(label_contents, channels=1), dtype=tf.float32)
+	label = tf.cast(tf.image.decode_png(label_contents, channels=1), dtype=tf.float32)
 
 	if cfg.random_mirror:
 		img, label = _image_mirroring(img, label)
