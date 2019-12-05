@@ -265,6 +265,7 @@ dmypy.json
 
 # dataset
 train-*
+cityscapes*
 
 # tensorboard
 events.*
