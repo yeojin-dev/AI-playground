@@ -377,3 +377,5 @@ class Visualizer:
 		prc = mp.Process(target=self._save_and_show, args=(images, preds, ids))
 		prc.daemon = True
 		prc.start()
+
+		prc.join()
