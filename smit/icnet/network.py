@@ -2,7 +2,7 @@ import tensorflow as tf
 
 DEFAULT_ACTIVATION = tf.nn.relu
 DEFAULT_INITIALIZER = tf.initializers.glorot_normal()
-BN_TRAINING = True
+BN_TRAINING = False
 
 
 def layer(op):
@@ -45,12 +45,13 @@ class Network:
 		return self
 
 	@layer
-	def conv(self, inputs, filters, kernel_size=3, strides=1, padding='SAME',
+	def conv(self, inputs, filters, kernel_size=3, rate=1, strides=1, padding='SAME',
 			 activation=DEFAULT_ACTIVATION, use_bias=False, kernel_initializer=DEFAULT_INITIALIZER, name=None):
 		output = tf.layers.conv2d(
 			inputs=inputs,
 			filters=filters,
 			kernel_size=kernel_size,
+			dilation_rate=rate,
 			strides=strides,
 			padding=padding,
 			activation=activation,
@@ -64,6 +65,7 @@ class Network:
 	@layer
 	def conv_nn(self, inputs, filters, rate=1, strides=[1, 1, 1, 1], padding='SAME',
 				activation=DEFAULT_ACTIVATION, use_bias=False, kernel_initializer=DEFAULT_INITIALIZER, name=None):
+
 		with tf.variable_scope(name):
 			kernels = tf.get_variable(name='kernel', shape=filters, initializer=kernel_initializer)
 
@@ -99,13 +101,7 @@ class Network:
 
 	@layer
 	def max_pool(self, inputs, pool_size=2, strides=2, padding='SAME', name=None):
-		return tf.layers.max_pooling2d(
-			inputs=inputs,
-			pool_size=pool_size,
-			strides=strides,
-			padding=padding,
-			name=name,
-		)
+		return tf.layers.max_pooling2d(inputs=inputs, pool_size=pool_size, strides=strides, padding=padding, name=name)
 
 	@layer
 	def dense(self, inputs, units=1000, activation=None, use_bias=True, kernel_initializer=DEFAULT_INITIALIZER, name=None):
@@ -126,15 +122,10 @@ class Network:
 
 	@layer
 	def resize_bilinear(self, inputs, size, name):
-		return tf.image.resize_bilinear(
-			images=inputs,
-			size=size,
-			align_corners=True,
-			name=name,
-		)
+		return tf.image.resize_bilinear(inputs, size=size, align_corners=True, name=name)
 
 	@layer
-	def d_conv(self, inputs, filters, rate=1, strides=[1, 1, 1, 1], padding='SAME',
+	def d_conv(self, inputs, filters, strides=1, rate=2, padding='SAME',
 			   activation=DEFAULT_ACTIVATION, use_bias=False, kernel_initializer=DEFAULT_INITIALIZER, name=None):
 		with tf.variable_scope(name):
 			kernel = tf.get_variable(name='kernel', shape=filters, initializer=kernel_initializer)

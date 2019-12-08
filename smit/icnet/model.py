@@ -67,11 +67,11 @@ class ICNet(Network):
 		scope = name + '_mb'
 		with tf.variable_scope(scope):
 			(self.feed(inputs)
-				.conv_nn(filters=(1, 1, ch_in, depth4), strides=strides, activation=None, name='1x1_1', reuse=reuse)
+				.conv_nn(filters=(1, 1, ch_in, depth4), strides=strides, activation=None, name='1x1_1')
 				.batch_normalization(name='1x1_1bn')
-				.conv_nn(filters=(3, 3, depth4, depth4), activation=None, name='3x3_2', reuse=reuse)
+				.conv_nn(filters=(3, 3, depth4, depth4), activation=None, name='3x3_2')
 				.batch_normalization(name='3x3_2bn')
-				.conv_nn(filters=(1, 1, depth4, ch_out), name='1x1_3', activation=None, reuse=reuse)
+				.conv_nn(filters=(1, 1, depth4, ch_out), name='1x1_3', activation=None)
 				.batch_normalization(name='1x1_3bn', activation=None))
 
 			mb_out = self.terminals[0] + 0.0
@@ -86,11 +86,11 @@ class ICNet(Network):
 
 		with tf.variable_scope(name):
 			(self.feed(inputs)
-				.conv(filters=32, kernel_size=3, strides=2, activation=None, name='conv1_1', reuse=reuse)
+				.conv(filters=32, kernel_size=3, strides=2, activation=None, name='conv1_1')
 				.batch_normalization(name='conv1_1bn')
-				.conv(filters=32, kernel_size=3, strides=1, activation=None, name='conv1_2', reuse=reuse)
+				.conv(filters=32, kernel_size=3, strides=1, activation=None, name='conv1_2')
 				.batch_normalization(name='conv1_2bn')
-				.conv(filters=64, kernel_size=3, strides=1, activation=None, name='conv1_3', reuse=reuse)
+				.conv(filters=64, kernel_size=3, strides=1, activation=None, name='conv1_3')
 				.batch_normalization(name='conv1_3bn')
 				.max_pool(pool_size=3, name='max_pool'))
 
@@ -193,11 +193,11 @@ class ICNet(Network):
 		depth4 = ch_out // 4
 		with tf.variable_scope(scope):
 			(self.feed(inputs)
-				.conv_nn(filters=(1, 1, ch_in, depth4), strides=strides, activation=None, name='1x1_1', reuse=reuse)
+				.conv_nn(filters=(1, 1, ch_in, depth4), strides=strides, activation=None, name='1x1_1')
 				.batch_normalization(name='1x1_1bn')
-			 	.d_conv(filters=(3, 3, depth4, depth4), rate=rate, activation=None, name='d3x3_2', reuse=reuse)
+			 	.d_conv(filters=(3, 3, depth4, depth4), rate=rate, activation=None, name='d3x3_2')
 				.batch_normalization(name='3x3_2bn')
-				.conv_nn(filters=(1, 1, depth4, ch_out), name='1x1_3', activation=None, reuse=reuse)
+				.conv_nn(filters=(1, 1, depth4, ch_out), name='1x1_3', activation=None)
 				.batch_normalization(name='1x1_3bn', activation=None))
 
 			mb_out = self.terminals[0] + 0.0
@@ -262,13 +262,13 @@ class ICNet(Network):
 
 			self.reservoir[name+'_out'] = self.terminals[0] + 0.0
 
-			(self.conv_nn(filters=(3, 3, s_ch, 128), rate=2, activation=None, name='3x3', reuse=reuse)
+			(self.conv_nn(filters=(3, 3, s_ch, 128), rate=2, activation=None, name='3x3')
 				.batch_normalization(activation=None, name='3x3bn'))
 
 			f_small = self.terminals[0] + 0.0
 
 			(self.feed(large_tensor)
-			 	.conv_nn(filters=(1, 1, l_ch, 128), activation=None, name='1x1', reuse=reuse)
+			 	.conv_nn(filters=(1, 1, l_ch, 128), activation=None, name='1x1')
 				.batch_normalization(activation=None, name='1x1bn'))
 
 			f_used = tf.add(f_small, self.terminals[0])
@@ -296,6 +296,12 @@ class ICNet(Network):
 
 		return indices
 
+	def _get_pred(self, inputs):
+
+		size = tf.shape(self.images)[1:3]
+		pred = tf.image.resize_bilinear(inputs, size=size)
+		return tf.argmax(pred, axis=3)
+
 	def _loss(self, name, reuse=tf.AUTO_REUSE):
 		# prediction
 		tensors = (self.reservoir['sub4_out'], self.reservoir['sub2_out'], self.reservoir['sub1_out'])
@@ -303,14 +309,13 @@ class ICNet(Network):
 		losses = list()
 		predictions = list()
 		labels = list()
+		channels = [256, 128, 128]
 
 		with tf.variable_scope(name, reuse=reuse):
 			for index in range(len(tensors)):
 				(self.feed(tensors[index])
-				 	.conv(
-						filters=self.num_classes,
-						kernel_size=1,
-						strides=1,
+				 	.conv_nn(
+						filters=[1, 1, channels[index], self.num_classes],
 						use_bias=True,
 						activation=None,
 						name='cls_{}'.format(index)
@@ -318,14 +323,14 @@ class ICNet(Network):
 				)
 				predictions.append(self.terminals[0] + 0.0)
 
+			self.reservoir['digits_out'] = self._get_pred(predictions[-1])  # for inference or evaluation
+
 			# resizing labels
 			for index in range(len(predictions)):
 				size = tf.shape(predictions[index])[1:3]
 				(self.feed(self.labels)
 				 	.resize_nn(size, name='interp_{}'.format(index)))
 				labels.append(tf.squeeze(self.terminals[0], axis=[3]))
-
-			self.reservoir['digits_out'] = predictions[-1]
 
 			# ignore label process and loss calc.
 			t_loss = 0.0
