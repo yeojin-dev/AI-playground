@@ -1,6 +1,9 @@
 import multiprocessing as mp
 import os
 
+import matplotlib
+matplotlib.use('PS')
+
 import numpy as np
 import matplotlib.pyplot as plt
 import PIL.Image as Image
