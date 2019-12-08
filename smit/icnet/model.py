@@ -1,13 +1,14 @@
 import os
 
 import tensorflow as tf
+import tensorflow.bitwise as tw
 
 from network import Network
 
 
 class ICNet(Network):
 
-	def __init__(self, cfg, image_reader=None):
+	def __init__(self, cfg, train_reader, eval_reader):
 
 		self.cfg = cfg
 		self.mode = cfg.mode
@@ -17,20 +18,30 @@ class ICNet(Network):
 		self.reservoir = dict()
 		self.losses = None
 		self.start_epoch = 0
-		self.step_ph = tf.placeholder(dtype=tf.float32, shape=())
 
-		if self.mode == 'train':
-			self.images, self.labels = image_reader.dataset.get_next()
-			h, w = self.images.get_shape().as_list()[1:3]
-			size = (
-				int((h + 1) / 2),
-				int((w + 1) / 2),
-			)
-			self.images2 = tf.image.resize_bilinear(self.images, size=size, align_corners=True)
+		self.sum_loss = tf.placeholder(dtype=tf.float32, shape=(5,))
+		self.sum_acc = tf.placeholder(dtype=tf.float32, shape=(3,))
 
-			super().__init__()
-		else:
-			raise NotImplementedError('N/A, except for train mode')
+		self.eps = tf.constant(1e-5)
+
+		self.train_reader = train_reader.dataset
+		self.eval_reader = eval_reader.dataset
+
+		self.handle = tf.placeholder(tf.string, shape=[])
+		self.iterator = tf.data.Iterator.from_string_handle(self.handle, self.train_reader.output_types)
+
+		self.images, self.labels = self.iterator.get_next()
+		self.images.set_shape([None, None, None, 3])
+		self.labels.set_shape([None, None, None, 1])
+
+		size = tf.div(
+			tf.add(tf.shape(self.images)[1:3], tf.constant(1)),
+			tf.constant(2),
+		)
+
+		self.images2 = tf.image.resize_bilinear(self.images, size=size, align_corners=True)
+
+		super().__init__()
 
 	def _res_bottleneck(self, inputs, ch_in, ch_out, strides=(1, 1, 1, 1), name=None, reuse=tf.AUTO_REUSE):
 
@@ -335,6 +346,71 @@ class ICNet(Network):
 
 			return losses
 
+	def _confusion_matrix(self, pred, gt):
+		merged_maps = tw.bitwise_or(tw.left_shift(gt, 8), pred)
+		hist = tf.bincount(tf.reshape(merged_maps, (-1,)))
+		nonzero = tf.squeeze(tf.cast(tf.where(tf.not_equal(hist, 0)), dtype=tf.int32))
+
+		pred, gt = tw.bitwise_and(nonzero, 255), tw.right_shift(nonzero, 8)
+
+		class_cnt = self.num_classes
+		indices = class_cnt * gt + pred
+		shape = class_cnt * class_cnt
+
+		conf_matrix = tf.sparse_to_dense(indices, (shape,), tf.gather(hist, nonzero), 0)
+
+		return tf.cast(tf.reshape(conf_matrix, (class_cnt, class_cnt)), dtype=tf.float32)
+
+	def _mIoU(self, pred, gt):
+
+		conf_mat = self._confusion_matrix(pred, gt)  # 11-person, 12-rider
+
+		row_sum = tf.squeeze(tf.reduce_sum(conf_mat, axis=1))
+		col_sum = tf.squeeze(tf.reduce_sum(conf_mat, axis=0))
+		gt_class_num = tf.cast(tf.count_nonzero(row_sum), dtype=tf.float32)
+		diag = tf.squeeze(tf.diag_part(conf_mat))
+
+		union = row_sum + col_sum - diag + self.eps
+		mIoU = tf.truediv(tf.reduce_sum(tf.truediv(diag, union)), gt_class_num)
+
+		return mIoU, conf_mat
+
+	def _inference(self):
+
+		pred = self.reservoir['digits_out']
+
+		pred = tf.reshape(pred, (-1,))
+		labels = tf.reshape(self.labels, (-1,))  # flattening
+
+		mask = tf.not_equal(labels, self.ignore_label)
+		indices = tf.squeeze(tf.where(mask), 1)
+
+		gt = tf.cast(tf.gather(labels, indices), tf.int32)
+		pred = tf.cast(tf.gather(pred, indices), tf.int32)
+
+		mIoU, conf_mat = self._mIoU(pred, gt)
+		# person-11, rider-12
+		union = tf.reduce_sum(conf_mat[11, :])
+		personIoU = tf.cond(
+			tf.equal(union, 0),
+			lambda: 0.0,
+			lambda: tf.truediv(
+				conf_mat[11, 11],
+				union + tf.reduce_sum(conf_mat[:, 11]) - conf_mat[11, 11] + self.eps,
+			),
+		)
+		union = tf.reduce_sum(conf_mat[12, :])
+		riderIoU = tf.cond(
+			tf.equal(union, 0),
+			lambda: 0.0,
+			lambda: tf.truediv(
+				conf_mat[12, 12],
+				union + tf.reduce_sum(conf_mat[:, 12]) - conf_mat[12, 12] + self.eps,
+			)
+		)
+
+		return mIoU, personIoU, riderIoU
+
 	def optimizer(self):
 		# weight-decay, learning-rate control, optimizer selection with bn training
 		if self.cfg.WEIGHT_DECAY != 0.0:
@@ -360,6 +436,9 @@ class ICNet(Network):
 		config = tf.ConfigProto(gpu_options=gpu_options, allow_soft_placement=True)
 		self.sess = tf.Session(config=config)
 		self.sess.run(tf.global_variables_initializer())
+
+		self.train_handle = self.sess.run(self.train_reader.string_handle())
+		self.eval_handle = self.sess.run(self.eval_reader.string_handle())
 
 		# check-point processing
 		self.saver = tf.train.Saver()
@@ -387,16 +466,23 @@ class ICNet(Network):
 			print("**********************************************************")
 
 		# summary and summary Writer
-		_ = tf.summary.scalar('Branch4 Loss', self.losses[0])
-		_ = tf.summary.scalar('Branch2 Loss', self.losses[1])
-		_ = tf.summary.scalar('Branch1 Loss', self.losses[2])
-		_ = tf.summary.scalar('Total Loss', self.losses[3])
+		_ = tf.summary.scalar("Total_Loss", self.sum_loss[3])
+		_ = tf.summary.scalar("Branch-4 Loss", self.sum_loss[0])
+		_ = tf.summary.scalar("Branch-2 Loss", self.sum_loss[1])
+		_ = tf.summary.scalar("Branch-1 Loss", self.sum_loss[2])
+		_ = tf.summary.scalar("Mean IoU", self.sum_acc[0])
+		_ = tf.summary.scalar("Person IoU", self.sum_acc[1])
+		_ = tf.summary.scalar("Rider IoU", self.sum_acc[2])
 
 		self.summaries = tf.summary.merge_all()
 
 		self.writer = tf.summary.FileWriter(self.cfg.log_dir, self.sess.graph)
 
-		return train_op, self.losses, self.summaries
+		# inference and evaluation
+		IoUs = self._inference()
+		Images = (self.images, self.labels)
+
+		return train_op, self.losses, self.summaries, self.reservoir['digits_out'], IoUs, Images
 
 	def save(self, global_step):
 		self.saver.save(self.sess, self.ckpt_name, global_step)
