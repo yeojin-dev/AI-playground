@@ -56,7 +56,6 @@ class ICNet(Network):
 						strides=strides,
 						name='ch_modifier',
 						activation=None,
-						reuse=reuse
 					)
 					.batch_normalization(name='bn', activation=None))
 
@@ -183,7 +182,6 @@ class ICNet(Network):
 						strides=strides,
 						activation=None,
 						name='ch_modifier',
-						reuse=reuse
 					)
 					.batch_normalization(name='bn', activation=None))
 
@@ -239,15 +237,15 @@ class ICNet(Network):
 
 			return 0
 
-	def _branch1(self, inputs, name, reuse=False):
+	def _branch1(self, inputs, name, reuse=tf.AUTO_REUSE):
 
 		with tf.variable_scope(name):
 			(self.feed(inputs)
-				.conv(filters=32, kernel_size=3, strides=2, activation=None, name='3x3_1', reuse=reuse)
+				.conv(filters=32, kernel_size=3, strides=2, activation=None, name='3x3_1')
 			 	.batch_normalization(name='3x3_1bn')
-			 	.conv(filters=32, kernel_size=3, strides=2, activation=None, name='3x3_2', reuse=reuse)
+			 	.conv(filters=32, kernel_size=3, strides=2, activation=None, name='3x3_2')
 			 	.batch_normalization(name='3x3_2bn')
-			 	.conv(filters=64, kernel_size=3, strides=2, activation=None, name='3x3_3', reuse=reuse)
+			 	.conv(filters=64, kernel_size=3, strides=2, activation=None, name='3x3_3')
 			 	.batch_normalization(name='3x3_3bn'))
 
 			self.reservoir['conv3'] = self.terminals[0] + 0.0
@@ -279,7 +277,7 @@ class ICNet(Network):
 
 			return self.terminals[0] + 0.0
 
-	def _tail(self, inputs, name, reuse=False):
+	def _tail(self, inputs, name, reuse=tf.AUTO_REUSE):
 
 		size = tf.multiply(tf.shape(inputs)[1:3], tf.constant(2))
 
@@ -298,7 +296,7 @@ class ICNet(Network):
 
 		return indices
 
-	def _loss(self, name, reuse=False):
+	def _loss(self, name, reuse=tf.AUTO_REUSE):
 		# prediction
 		tensors = (self.reservoir['sub4_out'], self.reservoir['sub2_out'], self.reservoir['sub1_out'])
 
@@ -306,7 +304,7 @@ class ICNet(Network):
 		predictions = list()
 		labels = list()
 
-		with tf.variable_scope(name):
+		with tf.variable_scope(name, reuse=reuse):
 			for index in range(len(tensors)):
 				(self.feed(tensors[index])
 				 	.conv(
@@ -315,8 +313,9 @@ class ICNet(Network):
 						strides=1,
 						use_bias=True,
 						activation=None,
-						name='cls_{}'.format(index),
-					reuse=reuse))
+						name='cls_{}'.format(index)
+					)
+				)
 				predictions.append(self.terminals[0] + 0.0)
 
 			# resizing labels

@@ -46,8 +46,7 @@ class Network:
 
 	@layer
 	def conv(self, inputs, filters, kernel_size=3, strides=1, padding='SAME',
-			 activation=DEFAULT_ACTIVATION, use_bias=False, kernel_initializer=DEFAULT_INITIALIZER,
-			 name=None, reuse=tf.AUTO_REUSE):
+			 activation=DEFAULT_ACTIVATION, use_bias=False, kernel_initializer=DEFAULT_INITIALIZER, name=None):
 		output = tf.layers.conv2d(
 			inputs=inputs,
 			filters=filters,
@@ -58,16 +57,14 @@ class Network:
 			use_bias=use_bias,
 			kernel_initializer=kernel_initializer,
 			name=name,
-			reuse=reuse,
 		)
 
 		return output
 
 	@layer
 	def conv_nn(self, inputs, filters, rate=1, strides=[1, 1, 1, 1], padding='SAME',
-				activation=DEFAULT_ACTIVATION, use_bias=False, kernel_initializer=DEFAULT_INITIALIZER,
-				name=None, reuse=tf.AUTO_REUSE):
-		with tf.variable_scope(name, reuse=reuse):
+				activation=DEFAULT_ACTIVATION, use_bias=False, kernel_initializer=DEFAULT_INITIALIZER, name=None):
+		with tf.variable_scope(name):
 			kernels = tf.get_variable(name='kernel', shape=filters, initializer=kernel_initializer)
 
 			x = tf.nn.conv2d(inputs, kernels, dilations=[1, 1, 1, 1], strides=strides, padding=padding)
@@ -138,8 +135,7 @@ class Network:
 
 	@layer
 	def d_conv(self, inputs, filters, rate=1, strides=[1, 1, 1, 1], padding='SAME',
-			   activation=DEFAULT_ACTIVATION, use_bias=False, kernel_initializer=DEFAULT_INITIALIZER,
-			   name=None, reuse=tf.AUTO_REUSE):
+			   activation=DEFAULT_ACTIVATION, use_bias=False, kernel_initializer=DEFAULT_INITIALIZER, name=None):
 		with tf.variable_scope(name):
 			kernel = tf.get_variable(name='kernel', shape=filters, initializer=kernel_initializer)
 
