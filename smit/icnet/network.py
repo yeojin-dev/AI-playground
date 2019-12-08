@@ -124,6 +124,10 @@ class Network:
 			return output
 
 	@layer
+	def avg_pool(self, inputs, pool_size=2, strides=2, padding='VALID', name=None):
+		return tf.layers.average_pooling2d(inputs=inputs, pool_size=pool_size, strides=strides, name=name)
+
+	@layer
 	def resize_bilinear(self, inputs, size, name):
 		return tf.image.resize_bilinear(
 			images=inputs,
