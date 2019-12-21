@@ -126,6 +126,7 @@ def main(_):
             sum_cost += cost
         mean_cost = sum_cost / float(per_epoch)
         print(f'Learning at {index} epoch, Cost of {mean_cost:1.4f}')
+        net.save(net.sess, index)
 
         # Evaluation
         batch_x, batch_y = mnist_data.eval_data()

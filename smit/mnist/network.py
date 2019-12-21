@@ -173,6 +173,7 @@ class MNIST:
         train_op = opt.minimize(self.cost)
 
         self.sess = tf.Session()
+        self.saver = tf.train.Saver()
         self.sess.run(tf.global_variables_initializer())
 
         self.writer.add_graph(self.sess.graph)
@@ -186,3 +187,6 @@ class MNIST:
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
         return accuracy
+
+    def save(self, sess, global_step):
+        self.saver.save(sess, './ckpt', global_step)
