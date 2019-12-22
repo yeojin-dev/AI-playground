@@ -77,7 +77,7 @@ class Network:
 
 			if activation is not None:
 				x = activation(x)
-
+				x = tf.nn.dropout(x, 0.5)
 			return x
 
 	@layer
