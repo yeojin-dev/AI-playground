@@ -272,3 +272,6 @@ events.*
 
 # results
 res*
+
+# tensorflow checkpoints
+ckpt
