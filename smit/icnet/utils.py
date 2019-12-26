@@ -373,7 +373,7 @@ class Visualizer:
 		filename = os.path.join(self.res_dir, f'gt{ids}.png')
 		g_image.save(filename)
 
-		self._show_image(np.array(p_image, np.float32), ids)
+		# self._show_image(np.array(p_image, np.float32), ids)
 
 	def save_and_show(self, images, preds, ids):
 
